@@ -5,7 +5,7 @@ import logging
 
 class BotLogger:
 
-    def __init__(*args, **kwargs):
+    def __init__(self, *args, **kwargs):
         self._logger = logging.getLogger('SuggestionBot')
 
         log_level = os.getenv('LOG_LEVEL', 'DEBUG')
@@ -18,23 +18,23 @@ class BotLogger:
         else:
             self._log_handler = logging.StreamHandler(sys.stdout)
 
-        self._handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
-        self._logger.addHandler(self._handler)
+        self._log_handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
+        self._logger.addHandler(self._log_handler)
 
-    def debug(msg, *args, **kwargs):
+    def debug(self, msg, *args, **kwargs):
         self._logger.debug(msg, *args, **kwargs)
 
-    def info(msg, *args, **kwargs):
+    def info(self, msg, *args, **kwargs):
         self._logger.info(msg, *args, **kwargs)
 
-    def warning(msg, *args, **kwargs):
+    def warning(self, msg, *args, **kwargs):
         self._logger.warning(msg, *args, **kwargs)
 
-    def error(msg, *args, **kwargs):
+    def error(self, msg, *args, **kwargs):
         self._logger.error(msg, *args, **kwargs)
 
-    def critical(msg, *args, **kwargs):
+    def critical(self, msg, *args, **kwargs):
         self._logger.critical(msg, *args, **kwargs)
 
-    def exception(msg, *args, **kwargs):
+    def exception(self, msg, *args, **kwargs):
         self._logger.exception(msg, *args, **kwargs)
