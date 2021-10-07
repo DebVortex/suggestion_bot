@@ -1,5 +1,6 @@
 # suggestion_bot
-Discord but that monitors a suggestion channel and sort the messages by (reaction-)votes
+
+Discord bot that monitors suggestion channels and sort the messages by (reaction-)votes 
 
 ## Installation
 
