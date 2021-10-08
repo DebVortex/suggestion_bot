@@ -35,7 +35,8 @@ The following environment variables are nessessary:
 * `DISCORD_BOT_TOKEN`. The API token for the bot to connect with
 * `DELETION_MESSAGE`. Path to the file, that contains the message template that
   gets send to the user, if his message does not meet the criteria of the format
-  or the summary length. The template musst contain `{orig_message}`. 
+  or the summary length. The template musst contain `{orig_message}`,
+  `{max_length}` and `{channel}`
 
 The following environment variables are optional:
 
