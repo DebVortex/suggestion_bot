@@ -1,7 +1,11 @@
 import sys
 import os
+import re
 
 from discord import Client
+
+SUMMARY_REGEX = r'.*\[(?P<summary>.*)\].*'
+
 
 class SuggestionBot(Client):
 
@@ -42,17 +46,38 @@ class SuggestionBot(Client):
         self.logger.info(f'Setting channels to watch to {channels}')
         self.channels = channels.split(';')
 
+        self.logger.debug('Compiling RegEx')
+        self.check = re.compile(SUMMARY_REGEX)
+        self.logger.info('Setup of RegEx complete.')
+
+        self.logger.debug('Finished SuggestionBot.__init__')
+
+    def get_decline_reason(self, msg):
+        match = self.check.match(msg)
+        if not match:
+            return 'Incorrect message format.'
+        summary = match.group('summary')
+        if len(summary) > self.max_length:
+            return 'Summary is to long.'
 
     async def on_ready(self):
         self.logger.info('Logged on as {0}!'.format(self.user))
 
     async def on_message(self, message):
         if self.user == message.author:
+            # Do not react to messages of the bot
             return
-        # check message.cannel if in correct channel
-        # check message.content if correct structure
 
-        # if WRONG structure:
+        self.logger.info(f'Got message from {message.author} in {message.channel}')
+        if message.channel.name not in self.channels:
+            self.logger.info(f'Ignoring message, as its not in a channel to watch.')
+            return
+
+        decline_reason = self.get_decline_reason(message.content)
+        if not decline_reason:
+            self.logger.info(f'Message from {message.author} accepted.')
+            return
+
         orig_message = message.content
         author = message.author
         await message.delete()
@@ -61,7 +86,8 @@ class SuggestionBot(Client):
             self.message_template.format(
                 channel=message.channel,
                 max_length=self.max_length,
-                orig_message=orig_message
+                orig_message=orig_message,
+                reason=decline_reason
             )
         )
         self.logger.info('Message from {0.author} in {0.channel}: {0.content}'.format(message))

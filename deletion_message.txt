@@ -1,6 +1,10 @@
 Hello human,
 
-your message to the {channel} was unfortunately not in the correct format and has been deleted. The format looks as follows:
+your message to the {channel} was unfortunately not accepted and has been deleted.
+
+The reason, why it declined was: {reason}
+
+The format looks as follows:
 
 ```
 [a short summary]

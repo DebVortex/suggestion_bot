@@ -1,6 +1,6 @@
 # suggestion_bot
 
-Discord bot that monitors suggestion channels and sort the messages by (reaction-)votes 
+Discord bot that monitors suggestion channels and sort the messages by (reaction-)votes
 
 ## Installation
 
@@ -36,7 +36,7 @@ The following environment variables are nessessary:
 * `DELETION_MESSAGE`. Path to the file, that contains the message template that
   gets send to the user, if his message does not meet the criteria of the format
   or the summary length. The template musst contain `{orig_message}`,
-  `{max_length}` and `{channel}`
+  `{max_length}`, `{reason}` and `{channel}`
 
 The following environment variables are optional:
 
