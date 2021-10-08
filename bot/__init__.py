@@ -30,10 +30,10 @@ class SuggestionBot(Client):
             self.logger.critical(f'Exiting.')
             sys.exit(1)
 
-        self.logger.debug('Loading SUBJECT_MAX_LENGTH.')
-        max_length = os.getenv('SUBJECT_MAX_LENGTH')
+        self.logger.debug('Loading SUMMARY_MAX_LENGTH.')
+        max_length = os.getenv('SUMMARY_MAX_LENGTH')
         if not max_length:
-            self.logger.warning('No SUBJECT_MAX_LENGTH defined, falling back to default.')
+            self.logger.warning('No SUMMARY_MAX_LENGTH defined, falling back to default.')
             max_length = 200
         self.logger.info(f'Setting summary max length to {max_length}')
         self.max_length = max_length

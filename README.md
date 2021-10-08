@@ -41,6 +41,6 @@ The following environment variables are nessessary:
 The following environment variables are optional:
 
 * `WATCH_CHANNELS`. A `;` list of channels to watch. Defaults to `suggestion`.
-* `SUBJECT_MAX_LENGTH`
+* `SUMMARY_MAX_LENGTH`. Maximum length the subject summary is allowed to be. Defaults to `100`.
 * `LOG_LEVEL`. Can be one of the following: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`, `EXCEPTION`. Defaults to `DEBUG`.
 * `LOG_FILE`. File to write log messages to. Musst be a file path. If not set, it will log to stdout.
