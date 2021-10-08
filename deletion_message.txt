@@ -1,7 +1,6 @@
 Hello human,
 
-your message to the {channel} was unfortunately not in the correct
-format and has been deleted. The format looks as follows:
+your message to the {channel} was unfortunately not in the correct format and has been deleted. The format looks as follows:
 
 ```
 [a short summary]
@@ -10,8 +9,7 @@ Detailed information about your suggestion.
 ```
 
 The maximum length of the summary is {max_length} characters.
-Please try again. Don't worry, your old message is not lost. Here you
-have your text to copy, paste, reformat and send again:
+Please try again. Don't worry, your old message is not lost. Here you have your text to copy, paste, reformat and send again:
 
 ```
 {orig_message}
