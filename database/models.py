@@ -1,6 +1,6 @@
-from peewee import SqliteDatabase, Model, CharField,  SmallIntegerField
+from peewee import Model, CharField,  SmallIntegerField
 
-db = SqliteDatabase('people.db')
+from database import db
 
 STATE_NEW = 0
 STATE_ACCEPTED = 1
