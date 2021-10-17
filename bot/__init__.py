@@ -72,7 +72,12 @@ class SuggestionBot(Bot):
     def accept_message(self, message, match):
         if not Suggestion.filter(discord_id=message.id).count():
             summary = match.group('summary')
-            Suggestion.create(discord_id=message.id, summary=summary)
+            Suggestion.create(
+                discord_id=message.id,
+                channel_id=message.channel.id,
+                guild_id=message.guild.id,
+                summary=summary
+            )
             self.logger.info(f'Saved message with ID {message.id} in database.')
             return
         self.logger.info(f'Message with ID {message.id} already in database.')
