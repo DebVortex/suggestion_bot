@@ -10,6 +10,7 @@ class Suggestion(Model):
     summary = CharField()
     discord_id = CharField()
     channel_id = CharField()
+    channel_name = CharField()
     guild_id = CharField()
     state =  SmallIntegerField(default=STATE_NEW)
 

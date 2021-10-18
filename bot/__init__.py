@@ -75,6 +75,7 @@ class SuggestionBot(Bot):
             Suggestion.create(
                 discord_id=message.id,
                 channel_id=message.channel.id,
+                channel_name=message.channel.name,
                 guild_id=message.guild.id,
                 summary=summary
             )
