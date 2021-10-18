@@ -25,18 +25,22 @@ async def show(ctx, state="new"):
         return
     suggestions = Suggestion.filter(state=selected_state)
     if suggestions.count():
-        embed = Embed(
-            title=f"All '{state}' suggestions",
-            description=f"Here you find all {state} suggestions, sorted by votes.",
-            color=0x03C6AB
-        )
+        channels = set([s.channel_name for s in suggestions])
+        embeds = {}
+        for channel in channels:
+            embeds[channel] = Embed(
+                title=f"All '{state}' suggestions from #{channel}",
+                description=f"Here you find all {state} suggestions, sorted by votes. Taken from the #{channel} channel.",
+                color=0x03C6AB
+            )
         for suggestion in suggestions:
-            embed.add_field(
+            embeds[suggestion.channel_name].add_field(
                 name=f"[{suggestion.id}] {suggestion.summary}",
                 value=f"[Jump to suggestion](https://discordapp.com/channels/{suggestion.guild_id}/{suggestion.channel_id}/{suggestion.discord_id})",
                 inline=False
             )
-        await ctx.message.channel.send(embed=embed)
+        for embed in embeds.values():
+            await ctx.message.channel.send(embed=embed)
     else:
         await ctx.message.channel.send(f"I was not able to find any saved suggestions for '{state}'")
 
