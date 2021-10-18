@@ -1,3 +1,3 @@
 from peewee import SqliteDatabase
 
-db = SqliteDatabase('people.db')
+db = SqliteDatabase('suggestions.db')
