@@ -41,21 +41,27 @@ async def show(ctx, state="new"):
         await ctx.message.channel.send(f"I was not able to find any saved suggestions for '{state}'")
 
 
+async def change_state(ctx, new_state, *ids):
+    suggestions = Suggestion.select().where(Suggestion.id.in_(ids))
+    updated = []
+    ctx.bot.logger.info(f"Found {suggestions.count()} suggestions, for IDs {ids}.")
+    for suggestion in suggestions:
+        getattr(suggestion, new_state)()
+        ctx.bot.logger.info(f"Updated {suggestion.id} and set state to {new_state}.")
+        updated.append(suggestion.id)
+    message = f"No suggestions found for the IDs: {ids}."
+    if updated:
+        message = f"Added {updated} to the {new_state} list."
+    await ctx.message.channel.send(message)
+
+
 @commands.command(
     brief="Accept suggestions",
     help="Accept suggestions. Suggestions are selected via the provided IDs."
 )
 async def accept(ctx, *ids):
-    # TODO: Combine accept, decline and renew
-    suggestions = Suggestion.select().where(Suggestion.id.in_(ids))
-    updated = []
-    for suggestion in suggestions:
-        suggestion.accept()
-        updated.append(suggestion.id)
-    message = f"No suggestions found for the IDs: {ids}."
-    if updated:
-        message = f"Added {updated} to the accepted list."
-    await ctx.message.channel.send(message)
+    ctx.bot.logger.info(f"Got 'accept' command from {ctx.author} for IDs '{ids}'.")
+    await change_state(ctx, 'accept', *ids)
 
 
 @commands.command(
@@ -63,16 +69,8 @@ async def accept(ctx, *ids):
     help="Decline suggestions. Suggestions are selected via the provided IDs."
 )
 async def decline(ctx, *ids):
-    # TODO: Combine accept, decline and renew
-    suggestions = Suggestion.select().where(Suggestion.id.in_(ids))
-    updated = []
-    for suggestion in suggestions:
-        suggestion.decline()
-        updated.append(suggestion.id)
-    message = f"No suggestions found for the IDs: {ids}."
-    if updated:
-        message = f"Added {updated} to the declined list."
-    await ctx.message.channel.send(message)
+    ctx.bot.logger.info(f"Got 'decline' command from {ctx.author} for IDs '{ids}'.")
+    await change_state(ctx, 'decline', *ids)
 
 
 @commands.command(
@@ -80,16 +78,8 @@ async def decline(ctx, *ids):
     help="Set the state of suggestions back to new. Suggestions are selected via the provided IDs."
 )
 async def renew(ctx, *ids):
-    # TODO: Combine accept, decline and renew
-    suggestions = Suggestion.select().where(Suggestion.id.in_(ids))
-    updated = []
-    for suggestion in suggestions:
-        suggestion.renew()
-        updated.append(suggestion.id)
-    message = f"No suggestions found for the IDs: {ids}."
-    if updated:
-        message = f"Added {updated} to the new list."
-    await ctx.message.channel.send(message)
+    ctx.bot.logger.info(f"Got 'renew' command from {ctx.author} for IDs '{ids}'.")
+    await change_state(ctx, 'renew', *ids)
 
 
 COMMANDS = [show, accept, decline, renew]
