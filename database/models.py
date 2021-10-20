@@ -1,4 +1,4 @@
-from peewee import Model, CharField,  SmallIntegerField
+from peewee import Model, CharField, IntegerField, SmallIntegerField
 
 from database import db
 
@@ -8,10 +8,9 @@ STATE_DECLINED = 2
 
 class Suggestion(Model):
     summary = CharField()
-    discord_id = CharField()
-    channel_id = CharField()
-    channel_name = CharField()
-    guild_id = CharField()
+    discord_id = IntegerField()
+    channel_id = IntegerField()
+    guild_id = IntegerField()
     state =  SmallIntegerField(default=STATE_NEW)
 
     class Meta:
