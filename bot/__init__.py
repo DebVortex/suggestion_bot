@@ -48,6 +48,10 @@ class SuggestionBot(Bot):
         self.logger.info(f'Setting channels to watch to {channels}')
         self.channels = channels.split(';')
 
+        self.logger.debug('Loading SUMMARY_CHANNEL')
+        self.SUMMARY_CHANNEL = os.getenv('SUMMARY_CHANNEL')
+        self.logger.info(f"Set SUMMARY_CHANNEL to '{self.SUMMARY_CHANNEL}'")
+
         self.logger.debug('Compiling RegEx')
         self.check = re.compile(SUMMARY_REGEX)
         self.logger.info('Setup of RegEx complete.')
@@ -75,7 +79,6 @@ class SuggestionBot(Bot):
             Suggestion.create(
                 discord_id=message.id,
                 channel_id=message.channel.id,
-                channel_name=message.channel.name,
                 guild_id=message.guild.id,
                 summary=summary
             )
@@ -90,7 +93,7 @@ class SuggestionBot(Bot):
         if self.user == message.author:
             # Do not react to messages of the bot
             return
-        if message.channel.type.value == 1:
+        if message.channel.name == self.SUMMARY_CHANNEL:
             await super().on_message(message)
             return
 
