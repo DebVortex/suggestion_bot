@@ -4,12 +4,18 @@ from peewee import DoesNotExist
 
 from database.models import Suggestion, STATE_NEW, STATE_ACCEPTED, STATE_DECLINED
 
+UPVOTE = '👍'
+DOWNVOTE = '👎'
 
 POSSIBLE_STATES = {
     'new': STATE_NEW,
     'accepted': STATE_ACCEPTED,
     'declined': STATE_DECLINED
 }
+
+
+def sort_weighted_suggestions(msg):
+    return msg.votes['total'], msg.votes['up']
 
 
 @commands.command(
@@ -24,23 +30,50 @@ async def show(ctx, state="new"):
         await ctx.message.channel.send(f"I'm sorry, '{state}' is not a valid state. Please choose one of: new, accepted, declined")
         return
     suggestions = Suggestion.filter(state=selected_state)
+    sug = suggestions[0]
+    channel = ctx.guild.get_channel(int(sug.channel_id))
     if suggestions.count():
-        channels = set([s.channel_name for s in suggestions])
-        embeds = {}
-        for channel in channels:
-            embeds[channel] = Embed(
-                title=f"All '{state}' suggestions from #{channel}",
-                description=f"Here you find all {state} suggestions, sorted by votes. Taken from the #{channel} channel.",
-                color=0x03C6AB
-            )
+        channel_ids = set([s.channel_id for s in suggestions])
+        channels = {}
+        for channel_id in channel_ids:
+            channel = ctx.guild.get_channel(channel_id)
+            if channel:
+                channels[channel.id] = {
+                    'channel': channel,
+                    'embed': Embed(
+                        title=f"All '{state}' suggestions from #{channel.name}",
+                        description=f"Here you find all {state} suggestions, sorted by votes. Taken from the #{channel} channel.",
+                        color=0x03C6AB
+                    )
+                }
+
+        channels_with_weighted_suggestions = {}
         for suggestion in suggestions:
-            embeds[suggestion.channel_name].add_field(
-                name=f"[{suggestion.id}] {suggestion.summary}",
-                value=f"[Jump to suggestion](https://discordapp.com/channels/{suggestion.guild_id}/{suggestion.channel_id}/{suggestion.discord_id})",
-                inline=False
-            )
-        for embed in embeds.values():
-            await ctx.message.channel.send(embed=embed)
+            suggestion.votes = { 'up': 0, 'down': 0, 'total': 0}
+            channel = channels.get(suggestion.channel_id, {}).get('channel')
+            if channel:
+                message = await channel.fetch_message(suggestion.discord_id)
+                if not channel.name in channels_with_weighted_suggestions:
+                    channels_with_weighted_suggestions[channel.name] = []
+                for reaction in message.reactions:
+                    if reaction.emoji == UPVOTE:
+                        suggestion.votes['up'] += reaction.count
+                        suggestion.votes['total'] += reaction.count
+                    if reaction.emoji == DOWNVOTE:
+                        suggestion.votes['down'] += reaction.count
+                        suggestion.votes['total'] += reaction.count
+                channels_with_weighted_suggestions[channel.name].append(suggestion)
+
+        for suggestions in channels_with_weighted_suggestions.values():
+            sorted_suggestions = sorted(suggestions, key=sort_weighted_suggestions, reverse=True)
+            for suggestion in sorted_suggestions:
+                channels[suggestion.channel_id]['embed'].add_field(
+                    name=f"[{suggestion.id}] {suggestion.summary} | **{suggestion.votes['up']}x{UPVOTE}** | **{suggestion.votes['down']}x{DOWNVOTE}**",
+                    value=f"[Jump to suggestion](https://discordapp.com/channels/{suggestion.guild_id}/{suggestion.channel_id}/{suggestion.discord_id})",
+                    inline=False
+                )
+        for channel in channels.values():
+            await ctx.message.channel.send(embed=channel['embed'])
     else:
         await ctx.message.channel.send(f"I was not able to find any saved suggestions for '{state}'")
 
