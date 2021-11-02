@@ -119,4 +119,44 @@ async def renew(ctx, *ids):
     await change_state(ctx, 'renew', *ids)
 
 
-COMMANDS = [show, accept, decline, renew]
+async def index_channel(ctx, channel):
+    ctx.bot.logger.info(f"Indexing channel '{channel}'.")
+    async for message in channel.history(limit=None):
+        if message.author == ctx.bot.user:
+            continue
+
+        match = ctx.bot.check.match(message.content)
+        decline_reason = ctx.bot.get_decline_reason(match)
+        if not decline_reason:
+            ctx.bot.logger.info(f'Message from {message.author} in correct format.')
+            suggestions = Suggestion.filter(Suggestion.discord_id == message.id)
+            if suggestions.count():
+                ctx.bot.logger.info(f'Found suggestion for message with ID {message.id}.')
+                continue
+            ctx.bot.logger.info(f'Creating suggestion for message with ID {message.id}.')
+            summary = match.group('summary')
+            suggestion = Suggestion.create(
+                guild_id=ctx.guild.id,
+                channel_id=channel.id,
+                discord_id=message.id,
+                summary=summary,
+                state=STATE_NEW
+            )
+            ctx.bot.logger.info(f"Created suggestion {suggestion.id} for message {message.id} in channel {channel.name}.")
+        
+@commands.command(
+    brief="Index all messages in all WATCH_CHANNELS",
+    help="Index all messages in all WATCH_CHANNELS. This might take some time. All messages not already saved will be added to the database."
+)
+async def index_channels(ctx):
+    ctx.bot.logger.info(f"Got 'index' command from {ctx.author}.")
+    await ctx.message.channel.send(f"Human wants me to work, eh? This will take some time, please be patient...")
+    old_count = Suggestion.select().count()
+    for channel in ctx.guild.channels:
+        if channel.name in ctx.bot.channels: 
+            if channel:
+                await index_channel(ctx, channel)
+    await ctx.message.channel.send(f"Done! I had {old_count} suggestions in my DB and now I have {Suggestion.filter().count()}")
+
+
+COMMANDS = [show, accept, decline, renew, index_channels]
