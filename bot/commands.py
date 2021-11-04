@@ -22,7 +22,7 @@ def sort_weighted_suggestions(msg):
     brief="Show suggestions",
     help="Shows a list of suggestions of the specified state. State can be new, accepted or declined. If none is provided, new will be assumed."
 )
-async def show(ctx, state="new"):
+async def show(ctx, state="new", page=1):
     ctx.bot.logger.info(f"Got 'show' command from {ctx.author} with state '{state}'.")
     selected_state = POSSIBLE_STATES.get(state)
     if selected_state is None:
@@ -32,7 +32,8 @@ async def show(ctx, state="new"):
     suggestions = Suggestion.filter(state=selected_state)
     sug = suggestions[0]
     channel = ctx.guild.get_channel(int(sug.channel_id))
-    if suggestions.count():
+    count = suggestions.count()
+    if count:
         channel_ids = set([s.channel_id for s in suggestions])
         channels = {}
         for channel_id in channel_ids:
@@ -66,7 +67,7 @@ async def show(ctx, state="new"):
 
         for suggestions in channels_with_weighted_suggestions.values():
             sorted_suggestions = sorted(suggestions, key=sort_weighted_suggestions, reverse=True)
-            for suggestion in sorted_suggestions:
+            for suggestion in sorted_suggestions[(page-1)*5:page*5]:
                 channels[suggestion.channel_id]['embed'].add_field(
                     name=f"[{suggestion.id}] {suggestion.summary} | **{suggestion.votes['up']}x{UPVOTE}** | **{suggestion.votes['down']}x{DOWNVOTE}**",
                     value=f"[Jump to suggestion](https://discordapp.com/channels/{suggestion.guild_id}/{suggestion.channel_id}/{suggestion.discord_id})",
