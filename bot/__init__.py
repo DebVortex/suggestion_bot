@@ -8,6 +8,8 @@ from database.models import Suggestion
 
 SUMMARY_REGEX = r'.*\[(?P<summary>.*)\].*'
 
+from .utils import get_votes, UPVOTE, DOWNVOTE
+
 
 class SuggestionBot(Bot):
 
@@ -76,7 +78,32 @@ class SuggestionBot(Bot):
                 reason=decline_reason
             )
         )
-        self.logger.info(f'Message from {message.author} in {message.channel}: {message.content.content}')
+        self.logger.info(f'Message from {message.author} in {message.channel}: {message.content}')
+
+    async def on_raw_reaction_add(self, payload):
+        await self.handle_reaction_change(payload)
+
+    async def on_raw_reaction_remove(self, payload):
+        await self.handle_reaction_change(payload)
+
+    async def on_raw_reaction_clear(self, payload):
+        await self.handle_reaction_change(payload)
+
+    async def handle_reaction_change(self, payload):
+        self.logger.info(f'Got reaction change for message {payload.message_id}')
+        try:
+            suggestion = Suggestion.get(Suggestion.discord_id == payload.message_id)
+            channel = await self.fetch_channel(payload.channel_id)
+            message = await channel.fetch_message(payload.message_id)
+            up_votes = get_votes(message.reactions, UPVOTE)
+            down_votes = get_votes(message.reactions, DOWNVOTE)
+            if suggestion.up_votes == up_votes and suggestion.down_votes == down_votes:
+                self.logger.info(f'No change in votes for message {payload.message_id}')
+                return
+            suggestion.set_votes(up_votes, down_votes)
+            self.logger.info(f'Updated votes for message {payload.message_id}: {up_votes}x{UPVOTE} and {down_votes}x{DOWNVOTE}')
+        except Suggestion.DoesNotExist:
+            self.logger.info(f'Message {payload.message_id} not in database.')
 
 
     def add_command(self, command):

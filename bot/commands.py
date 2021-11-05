@@ -4,8 +4,7 @@ from peewee import DoesNotExist
 
 from database.models import Suggestion, STATE_NEW, STATE_ACCEPTED, STATE_DECLINED
 
-UPVOTE = '👍'
-DOWNVOTE = '👎'
+from .utils import UPVOTE, DOWNVOTE, get_votes
 
 POSSIBLE_STATES = {
     'new': STATE_NEW,
@@ -120,6 +119,26 @@ async def renew(ctx, *ids):
     await change_state(ctx, 'renew', *ids)
 
 
+@commands.command(
+    brief="Update the vote counts of existing suggestions",
+    help="If the bot was offline for any reason, you can run update_votes to correct the votes int the database."
+)
+async def update_votes(ctx):
+    ctx.bot.logger.info(f"Got the 'update_votes' command from {ctx.author}.")
+    await ctx.message.channel.send(f"Ok Human. I'll update all the votes, of all suggestions... *sigh*")
+    for suggestion in Suggestion.filter():
+        channel = ctx.guild.get_channel(int(suggestion.channel_id))
+        if channel:
+            message = await channel.fetch_message(suggestion.discord_id)
+            up_votes = get_votes(message.reactions, UPVOTE)
+            down_votes = get_votes(message.reactions, DOWNVOTE)
+            if suggestion.up_votes == up_votes and suggestion.down_votes == down_votes:
+                ctx.bot.logger.info(f'No change in votes for message {suggestion.discord_id}')
+                continue
+            suggestion.set_votes(up_votes, down_votes)
+            ctx.bot.logger.info(f'Updated votes for message {suggestion.discord_id}: {up_votes}x{UPVOTE} and {down_votes}x{DOWNVOTE}')
+    await ctx.message.channel.send(f"There you go. All votes should be up to date.")
+
 async def index_channel(ctx, channel):
     ctx.bot.logger.info(f"Indexing channel '{channel}'.")
     async for message in channel.history(limit=None):
@@ -136,10 +155,14 @@ async def index_channel(ctx, channel):
                 continue
             ctx.bot.logger.info(f'Creating suggestion for message with ID {message.id}.')
             summary = match.group('summary')
+            up_votes = get_votes(message.reactions, UPVOTE)
+            down_votes = get_votes(message.reactions, DOWNVOTE)
             suggestion = Suggestion.create(
                 guild_id=ctx.guild.id,
                 channel_id=channel.id,
                 discord_id=message.id,
+                up_votes=up_votes,
+                down_votes=down_votes,
                 summary=summary,
                 state=STATE_NEW
             )
@@ -160,4 +183,4 @@ async def index_channels(ctx):
     await ctx.message.channel.send(f"Done! I had {old_count} suggestions in my DB and now I have {Suggestion.filter().count()}")
 
 
-COMMANDS = [show, accept, decline, renew, index_channels]
+COMMANDS = [show, accept, decline, renew, index_channels, update_votes]
