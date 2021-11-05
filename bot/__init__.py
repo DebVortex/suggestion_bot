@@ -66,19 +66,17 @@ class SuggestionBot(Bot):
             return 'Summary is to long.'
 
     async def decline_message(self, message, decline_reason):
-        orig_message = message.content
-        author = message.author
         await message.delete()
-        dm_channel = await author.create_dm()
+        dm_channel = await message.author.create_dm()
         await dm_channel.send(
             self.message_template.format(
                 channel=message.channel,
                 max_length=self.max_length,
-                orig_message=orig_message,
+                orig_message=message.content,
                 reason=decline_reason
             )
         )
-        self.logger.info('Message from {0.author} in {0.channel}: {0.content}'.format(message))
+        self.logger.info(f'Message from {message.author} in {message.channel}: {message.content.content}')
 
 
     def add_command(self, command):
@@ -112,7 +110,7 @@ class SuggestionBot(Bot):
 
         self.logger.info(f'Got message from {message.author} in {message.channel}')
         if message.channel.name not in self.channels:
-            self.logger.info(f'Ignoring message, as its not in a channel to watch.')
+            self.logger.info('Ignoring message, as its not in a channel to watch.')
             return
 
         match = self.check.match(message.content)
