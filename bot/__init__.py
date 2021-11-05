@@ -65,8 +65,21 @@ class SuggestionBot(Bot):
         if len(summary) > self.max_length:
             return 'Summary is to long.'
 
-    def decline_message(self):
-        ...
+    async def decline_message(self, message, decline_reason):
+        orig_message = message.content
+        author = message.author
+        await message.delete()
+        dm_channel = await author.create_dm()
+        await dm_channel.send(
+            self.message_template.format(
+                channel=message.channel,
+                max_length=self.max_length,
+                orig_message=orig_message,
+                reason=decline_reason
+            )
+        )
+        self.logger.info('Message from {0.author} in {0.channel}: {0.content}'.format(message))
+
 
     def add_command(self, command):
         if command.name != 'help':
@@ -109,16 +122,4 @@ class SuggestionBot(Bot):
             self.accept_message(message, match)
             return
 
-        orig_message = message.content
-        author = message.author
-        await message.delete()
-        dm_channel = await author.create_dm()
-        await dm_channel.send(
-            self.message_template.format(
-                channel=message.channel,
-                max_length=self.max_length,
-                orig_message=orig_message,
-                reason=decline_reason
-            )
-        )
-        self.logger.info('Message from {0.author} in {0.channel}: {0.content}'.format(message))
+        await self.decline_message(message, decline_reason)
