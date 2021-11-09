@@ -28,54 +28,35 @@ async def show(ctx, state="new", page=1):
         ctx.bot.logger.info(f"State '{state}' is not a valid state.")
         await ctx.message.channel.send(f"I'm sorry, '{state}' is not a valid state. Please choose one of: new, accepted, declined")
         return
-    suggestions = Suggestion.filter(state=selected_state)
-    sug = suggestions[0]
-    channel = ctx.guild.get_channel(int(sug.channel_id))
-    count = suggestions.count()
-    if count:
-        channel_ids = set([s.channel_id for s in suggestions])
-        channels = {}
-        for channel_id in channel_ids:
-            channel = ctx.guild.get_channel(channel_id)
-            if channel:
-                channels[channel.id] = {
-                    'channel': channel,
-                    'embed': Embed(
-                        title=f"All '{state}' suggestions from #{channel.name}",
-                        description=f"Here you find all {state} suggestions, sorted by votes. Taken from the #{channel} channel.",
-                        color=0x03C6AB
-                    )
-                }
 
-        channels_with_weighted_suggestions = {}
-        for suggestion in suggestions:
-            suggestion.votes = { 'up': 0, 'down': 0, 'total': 0}
-            channel = channels.get(suggestion.channel_id, {}).get('channel')
-            if channel:
-                message = await channel.fetch_message(suggestion.discord_id)
-                if not channel.name in channels_with_weighted_suggestions:
-                    channels_with_weighted_suggestions[channel.name] = []
-                for reaction in message.reactions:
-                    if reaction.emoji == UPVOTE:
-                        suggestion.votes['up'] += reaction.count
-                        suggestion.votes['total'] += reaction.count
-                    if reaction.emoji == DOWNVOTE:
-                        suggestion.votes['down'] += reaction.count
-                        suggestion.votes['total'] += reaction.count
-                channels_with_weighted_suggestions[channel.name].append(suggestion)
+    channels = [channel for channel in ctx.guild.text_channels if channel.name in ctx.bot.channels]
 
-        for suggestions in channels_with_weighted_suggestions.values():
-            sorted_suggestions = sorted(suggestions, key=sort_weighted_suggestions, reverse=True)
-            for suggestion in sorted_suggestions[(page-1)*5:page*5]:
-                channels[suggestion.channel_id]['embed'].add_field(
-                    name=f"[{suggestion.id}] {suggestion.summary} | **{suggestion.votes['up']}x{UPVOTE}** | **{suggestion.votes['down']}x{DOWNVOTE}**",
-                    value=f"[Jump to suggestion](https://discordapp.com/channels/{suggestion.guild_id}/{suggestion.channel_id}/{suggestion.discord_id})",
-                    inline=False
-                )
-        for channel in channels.values():
-            await ctx.message.channel.send(embed=channel['embed'])
-    else:
-        await ctx.message.channel.send(f"I was not able to find any saved suggestions for '{state}'")
+    for channel in channels:
+        suggestions = Suggestion.select().where(
+            Suggestion.channel_id == channel.id,
+            Suggestion.state == selected_state
+        ).order_by(
+            Suggestion.up_votes.desc()
+        )
+        count = suggestions.count()
+        if not count:
+            await ctx.message.channel.send(f"I was not able to find any saved suggestions for '{channel.name}.' with the state '{state}'.")
+            continue
+        
+        startEntry = ((page - 1) * 5) + 1
+        endEntry = page * 5
+        embed = Embed(
+            title=f"Showing suggestions for #{channel.name}",
+            description=f"Here you the '{state}' suggestions {startEntry}-{endEntry} of {count}, sorted by up votes. Taken from the #{channel} channel.",
+            color=0x03C6AB
+        )
+        for suggestion in suggestions.paginate(page, 5):
+            embed.add_field(
+                name=f"[{suggestion.id}] {suggestion.summary} | **{suggestion.up_votes}x{UPVOTE}** | **{suggestion.down_votes}x{DOWNVOTE}**",
+                value=f"[Jump to suggestion](https://discordapp.com/channels/{suggestion.guild_id}/{suggestion.channel_id}/{suggestion.discord_id})",
+                inline=False
+            )
+        await ctx.message.channel.send(embed=embed)
 
 
 async def change_state(ctx, new_state, *ids):
