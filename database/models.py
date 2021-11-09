@@ -12,6 +12,8 @@ class Suggestion(Model):
     channel_id = IntegerField()
     guild_id = IntegerField()
     state =  SmallIntegerField(default=STATE_NEW)
+    up_votes = IntegerField(default=0)
+    down_votes = IntegerField(default=0)
 
     class Meta:
         database = db
@@ -28,3 +30,8 @@ class Suggestion(Model):
 
     def renew(self):
         self.update_state(STATE_NEW)
+
+    def set_votes(self, upvote, downvote):
+        self.up_votes = upvote
+        self.down_votes = downvote
+        self.save()
