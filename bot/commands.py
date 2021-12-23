@@ -17,47 +17,73 @@ def sort_weighted_suggestions(msg):
     return msg.votes['total'], msg.votes['up']
 
 
+async def handle_channel(ctx, channel, state, page):
+    selected_state = await get_selected_state(ctx, state)
+    suggestions = Suggestion.select().where(
+        Suggestion.channel_id == channel.id,
+      Suggestion.state == selected_state
+    ).order_by(
+        Suggestion.up_votes.desc()
+    )
+    count = suggestions.count()
+    if not count:
+        await ctx.message.channel.send(f"I was not able to find any saved suggestions for '{channel.name}.' with the state '{state}'.")
+        return
+        
+    startEntry = ((page - 1) * 5) + 1
+    endEntry = page * 5
+    embed = Embed(
+        title=f"Showing suggestions for #{channel.name}",
+        description=f"Here you the '{state}' suggestions {startEntry}-{endEntry} of {count}, sorted by up votes. Taken from the #{channel} channel.",
+        color=0x03C6AB
+    )
+    for suggestion in suggestions.paginate(page, 5):
+        embed.add_field(
+            name=f"[{suggestion.id}] {suggestion.summary} | **{suggestion.up_votes}x{UPVOTE}** | **{suggestion.down_votes}x{DOWNVOTE}**",
+            value=f"[Jump to suggestion](https://discordapp.com/channels/{suggestion.guild_id}/{suggestion.channel_id}/{suggestion.discord_id})",
+            inline=False
+        )
+    await ctx.message.channel.send(embed=embed)
+
+async def get_selected_state(ctx, state):
+    selected_state = POSSIBLE_STATES.get(state)
+    if selected_state is None:
+        ctx.bot.logger.info(f"State '{state}' is not a valid state.")
+        await ctx.message.channel.send(f"I'm sorry, '{state}' is not a valid state. Please choose one of: new, accepted, declined")
+        return
+    return selected_state
+
+
 @commands.command(
     brief="Show suggestions",
     help="Shows a list of suggestions of the specified state. State can be new, accepted or declined. If none is provided, new will be assumed."
 )
 async def show(ctx, state="new", page=1):
     ctx.bot.logger.info(f"Got 'show' command from {ctx.author} with state '{state}'.")
-    selected_state = POSSIBLE_STATES.get(state)
-    if selected_state is None:
-        ctx.bot.logger.info(f"State '{state}' is not a valid state.")
-        await ctx.message.channel.send(f"I'm sorry, '{state}' is not a valid state. Please choose one of: new, accepted, declined")
-        return
-
     channels = [channel for channel in ctx.guild.text_channels if channel.name in ctx.bot.channels]
 
     for channel in channels:
-        suggestions = Suggestion.select().where(
-            Suggestion.channel_id == channel.id,
-            Suggestion.state == selected_state
-        ).order_by(
-            Suggestion.up_votes.desc()
-        )
-        count = suggestions.count()
-        if not count:
-            await ctx.message.channel.send(f"I was not able to find any saved suggestions for '{channel.name}.' with the state '{state}'.")
-            continue
+        await handle_channel(ctx, channel, state, page)
         
-        startEntry = ((page - 1) * 5) + 1
-        endEntry = page * 5
-        embed = Embed(
-            title=f"Showing suggestions for #{channel.name}",
-            description=f"Here you the '{state}' suggestions {startEntry}-{endEntry} of {count}, sorted by up votes. Taken from the #{channel} channel.",
-            color=0x03C6AB
-        )
-        for suggestion in suggestions.paginate(page, 5):
-            embed.add_field(
-                name=f"[{suggestion.id}] {suggestion.summary} | **{suggestion.up_votes}x{UPVOTE}** | **{suggestion.down_votes}x{DOWNVOTE}**",
-                value=f"[Jump to suggestion](https://discordapp.com/channels/{suggestion.guild_id}/{suggestion.channel_id}/{suggestion.discord_id})",
-                inline=False
-            )
-        await ctx.message.channel.send(embed=embed)
 
+@commands.command(
+    brief="Show suggestions for a specified channel",
+    help="Shows a list of suggestions of the specified state and channel. State can be new, accepted or declined. If none is provided, new will be assumed."
+)
+async def show_channel(ctx, channel=None, state="new", page=1):
+    if not channel:
+        await ctx.message.channel.send("Please provide a channel name.")
+        return
+    ctx.bot.logger.info(f"Got 'show-channel' command from {ctx.author} with state '{state}' for channel '{channel}'.")
+
+    channel_to_handle = None
+    for text_channel in ctx.guild.text_channels:
+        if text_channel.name == channel:
+            channel_to_handle = text_channel
+    if channel_to_handle:
+        await handle_channel(ctx, channel_to_handle, state, page)
+    else:
+        await ctx.message.channel.send(f"I'm not watching the '{channel}'. Channels watched are '{ctx.bot.channels}'.")
 
 async def change_state(ctx, new_state, *ids):
     suggestions = Suggestion.select().where(Suggestion.id.in_(ids))
@@ -164,4 +190,4 @@ async def index_channels(ctx):
     await ctx.message.channel.send(f"Done! I had {old_count} suggestions in my DB and now I have {Suggestion.filter().count()}")
 
 
-COMMANDS = [show, accept, decline, renew, index_channels, update_votes]
+COMMANDS = [show, show_channel, accept, decline, renew, index_channels, update_votes]
