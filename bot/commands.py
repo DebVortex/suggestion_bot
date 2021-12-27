@@ -1,6 +1,11 @@
+import tempfile
+from csv import writer as CsvWriter
+from io import StringIO
+
+
 from discord import Embed
 from discord.ext import commands
-from peewee import DoesNotExist
+from discord import File
 
 from database.models import Suggestion, STATE_NEW, STATE_ACCEPTED, STATE_DECLINED
 
@@ -10,6 +15,12 @@ POSSIBLE_STATES = {
     'new': STATE_NEW,
     'accepted': STATE_ACCEPTED,
     'declined': STATE_DECLINED
+}
+
+STATE_NAMES = {
+    STATE_NEW: 'new',
+    STATE_ACCEPTED: 'accepted',
+    STATE_DECLINED: 'declined'
 }
 
 
@@ -54,6 +65,81 @@ async def get_selected_state(ctx, state):
     return selected_state
 
 
+async def change_state(ctx, new_state, *ids):
+    suggestions = Suggestion.select().where(Suggestion.id.in_(ids))
+    updated = []
+    ctx.bot.logger.info(f"Found {suggestions.count()} suggestions, for IDs {ids}.")
+    for suggestion in suggestions:
+        getattr(suggestion, new_state)()
+        ctx.bot.logger.info(f"Updated {suggestion.id} and set state to {new_state}.")
+        updated.append(suggestion.id)
+    message = f"No suggestions found for the IDs: {ids}."
+    if updated:
+        message = f"Added {updated} to the {new_state} list."
+    await ctx.message.channel.send(message)
+async def index_channel(ctx, channel):
+    ctx.bot.logger.info(f"Indexing channel '{channel}'.")
+    async for message in channel.history(limit=None):
+        if message.author == ctx.bot.user:
+            continue
+
+        match = ctx.bot.check.match(message.content)
+        decline_reason = ctx.bot.get_decline_reason(match)
+        if not decline_reason:
+            ctx.bot.logger.info(f'Message from {message.author} in correct format.')
+            suggestions = Suggestion.filter(Suggestion.discord_id == message.id)
+            if suggestions.count():
+                ctx.bot.logger.info(f'Found suggestion for message with ID {message.id}.')
+                continue
+            ctx.bot.logger.info(f'Creating suggestion for message with ID {message.id}.')
+            summary = match.group('summary')
+            up_votes = get_votes(message.reactions, UPVOTE)
+            down_votes = get_votes(message.reactions, DOWNVOTE)
+            suggestion = Suggestion.create(
+                guild_id=ctx.guild.id,
+                channel_id=channel.id,
+                discord_id=message.id,
+                up_votes=up_votes,
+                down_votes=down_votes,
+                summary=summary,
+                state=STATE_NEW
+            )
+            ctx.bot.logger.info(f"Created suggestion {suggestion.id} for message {message.id} in channel {channel.name}.")
+
+
+async def export_channel(ctx, channel, state):
+    state_id = POSSIBLE_STATES.get(state)
+    query = { "channel_id": channel.id }
+    if state_id:
+        query['state'] = state_id
+    suggestions_to_export = Suggestion.filter(**query)
+    if not suggestions_to_export.count():
+        ctx.bot.logger.info(f"No suggestions found for channel {channel.name} with state {state} (None = all states)")
+        await ctx.message.channel.send(f"I was not able to find any saved suggestions for '{channel.name}' with the state '{state}'.")
+        return
+    ctx.bot.logger.info(f"Exporting {suggestions_to_export.count()} suggestions for channel {channel.name} with state {state} (None = all states)")
+    with tempfile.NamedTemporaryFile(mode="w+", suffix='.csv') as csvFile:
+        fieldnames = ['id', 'summary', 'state', 'up_votes', 'down_votes', 'link']
+        csv_writer = CsvWriter(csvFile)
+        csv_writer.writerow(fieldnames)
+        for suggestion in suggestions_to_export:
+            csv_writer.writerow([
+                suggestion.id,
+                suggestion.summary,
+                STATE_NAMES[suggestion.state],
+                suggestion.up_votes,
+                suggestion.down_votes,
+                f"https://discordapp.com/channels/{suggestion.guild_id}/{suggestion.channel_id}/{suggestion.discord_id}"
+            ])
+        csvFile.seek(0)
+        if state:
+            filename = f"{channel.name}-{state}.csv"
+        else:
+            filename = f"{channel.name}.csv"
+        ctx.bot.logger.info(f"Sending exported suggestions for channel {channel.name} with state {state} (None = all states) to {ctx.message.author}.")
+        await ctx.message.channel.send(file=File(StringIO(csvFile.read()), filename=filename))
+
+
 @commands.command(
     brief="Show suggestions",
     help="Shows a list of suggestions of the specified state. State can be new, accepted or declined. If none is provided, new will be assumed."
@@ -84,19 +170,6 @@ async def show_channel(ctx, channel=None, state="new", page=1):
         await handle_channel(ctx, channel_to_handle, state, page)
     else:
         await ctx.message.channel.send(f"I'm not watching the '{channel}'. Channels watched are '{ctx.bot.channels}'.")
-
-async def change_state(ctx, new_state, *ids):
-    suggestions = Suggestion.select().where(Suggestion.id.in_(ids))
-    updated = []
-    ctx.bot.logger.info(f"Found {suggestions.count()} suggestions, for IDs {ids}.")
-    for suggestion in suggestions:
-        getattr(suggestion, new_state)()
-        ctx.bot.logger.info(f"Updated {suggestion.id} and set state to {new_state}.")
-        updated.append(suggestion.id)
-    message = f"No suggestions found for the IDs: {ids}."
-    if updated:
-        message = f"Added {updated} to the {new_state} list."
-    await ctx.message.channel.send(message)
 
 
 @commands.command(
@@ -146,34 +219,6 @@ async def update_votes(ctx):
             ctx.bot.logger.info(f'Updated votes for message {suggestion.discord_id}: {up_votes}x{UPVOTE} and {down_votes}x{DOWNVOTE}')
     await ctx.message.channel.send(f"There you go. All votes should be up to date.")
 
-async def index_channel(ctx, channel):
-    ctx.bot.logger.info(f"Indexing channel '{channel}'.")
-    async for message in channel.history(limit=None):
-        if message.author == ctx.bot.user:
-            continue
-
-        match = ctx.bot.check.match(message.content)
-        decline_reason = ctx.bot.get_decline_reason(match)
-        if not decline_reason:
-            ctx.bot.logger.info(f'Message from {message.author} in correct format.')
-            suggestions = Suggestion.filter(Suggestion.discord_id == message.id)
-            if suggestions.count():
-                ctx.bot.logger.info(f'Found suggestion for message with ID {message.id}.')
-                continue
-            ctx.bot.logger.info(f'Creating suggestion for message with ID {message.id}.')
-            summary = match.group('summary')
-            up_votes = get_votes(message.reactions, UPVOTE)
-            down_votes = get_votes(message.reactions, DOWNVOTE)
-            suggestion = Suggestion.create(
-                guild_id=ctx.guild.id,
-                channel_id=channel.id,
-                discord_id=message.id,
-                up_votes=up_votes,
-                down_votes=down_votes,
-                summary=summary,
-                state=STATE_NEW
-            )
-            ctx.bot.logger.info(f"Created suggestion {suggestion.id} for message {message.id} in channel {channel.name}.")
         
 @commands.command(
     brief="Index all messages in all WATCH_CHANNELS",
@@ -190,4 +235,25 @@ async def index_channels(ctx):
     await ctx.message.channel.send(f"Done! I had {old_count} suggestions in my DB and now I have {Suggestion.filter().count()}")
 
 
-COMMANDS = [show, show_channel, accept, decline, renew, index_channels, update_votes]
+@commands.command(
+    brief="Export all suggestions to a CSV file",
+    help="Export all suggestions to a CSV file. The file will be send to the user."
+)
+async def export(ctx, channel=None, state=None):
+    ctx.bot.logger.info(f"Got 'export' command from {ctx.author}.")
+    channels_to_handle = []
+    for chn in ctx.guild.text_channels:
+        if chn.name in ctx.bot.channels:
+            channels_to_handle.append(chn)
+
+    if channel:
+        channels_to_handle = [chn for chn in channels_to_handle if chn.name == channel and chn.name in ctx.bot.channels]
+    else:
+        channels_to_handle = [chn for chn in ctx.guild.text_channels if chn.name in ctx.bot.channels]
+
+    ctx.bot.logger.info(f"Preparing to export the following channels: {channels_to_handle}.")
+    for chn in channels_to_handle:
+        await export_channel(ctx, chn, state)
+
+
+COMMANDS = [show, show_channel, accept, decline, renew, index_channels, update_votes, export]
