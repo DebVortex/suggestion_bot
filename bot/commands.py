@@ -30,6 +30,8 @@ def sort_weighted_suggestions(msg):
 
 async def handle_channel(ctx, channel, state, page):
     selected_state = await get_selected_state(ctx, state)
+    if state and selected_state is None:
+        return
     suggestions = Suggestion.select().where(
         Suggestion.channel_id == channel.id,
       Suggestion.state == selected_state
@@ -108,10 +110,14 @@ async def index_channel(ctx, channel):
 
 
 async def export_channel(ctx, channel, state):
-    state_id = POSSIBLE_STATES.get(state)
+    selected_state = None
+    if state:
+        selected_state = await get_selected_state(ctx, state)
+        if selected_state is None:
+            return
     query = { "channel_id": channel.id }
-    if state_id:
-        query['state'] = state_id
+    if selected_state:
+        query['state'] = selected_state
     suggestions_to_export = Suggestion.filter(**query)
     if not suggestions_to_export.count():
         ctx.bot.logger.info(f"No suggestions found for channel {channel.name} with state {state} (None = all states)")
@@ -251,9 +257,12 @@ async def export(ctx, channel=None, state=None):
     else:
         channels_to_handle = [chn for chn in ctx.guild.text_channels if chn.name in ctx.bot.channels]
 
-    ctx.bot.logger.info(f"Preparing to export the following channels: {channels_to_handle}.")
-    for chn in channels_to_handle:
-        await export_channel(ctx, chn, state)
+    if channels_to_handle:
+        ctx.bot.logger.info(f"Preparing to export the following channels: {channels_to_handle}.")
+        for chn in channels_to_handle:
+            await export_channel(ctx, chn, state)
+    else:
+        await ctx.message.channel.send(f"I'm not watching the '{channel}'. Channels watched are '{ctx.bot.channels}'.")
 
 
 COMMANDS = [show, show_channel, accept, decline, renew, index_channels, update_votes, export]
