@@ -142,7 +142,7 @@ class SuggestionBot(Bot):
 
         match = self.check.match(message.content)
         decline_reason = self.get_decline_reason(match)
-        if not decline_reason:
+        if not decline_reason or message.type == 18:
             self.logger.info(f'Message from {message.author} accepted.')
             self.accept_message(message, match)
             return
